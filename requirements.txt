@@ -1,4 +1,13 @@
+# Core
 numpy
 pandas
-seaborn
 matplotlib
+seaborn
+
+# ML
+scikit-learn==1.6.1
+joblib
+
+# Backend (optional - for API deployment)
+fastapi
+uvicorn
