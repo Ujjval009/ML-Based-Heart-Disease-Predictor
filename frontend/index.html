@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CardioRisk Predictor</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    body {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      min-height: 100vh;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+    .card {
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .input-field {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      transition: all 0.3s ease;
+    }
+    .input-field:focus {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: #ef4444;
+      box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+      outline: none;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      transition: all 0.3s ease;
+    }
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(239, 68, 68, 0.4);
+    }
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+    @keyframes pulse-ring {
+      0% { transform: scale(1); opacity: 1; }
+      100% { transform: scale(1.3); opacity: 0; }
+    }
+    .pulse {
+      position: relative;
+    }
+    .pulse::before {
+      content: '';
+      position: absolute;
+      inset: -4px;
+      border-radius: 50%;
+      border: 2px solid #ef4444;
+      animation: pulse-ring 1.5s ease-out infinite;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState } = React;
+
+    const inputConfig = [
+      { key: 'Age', label: 'Age', type: 'number', placeholder: 'e.g. 54', col: 1 },
+      { key: 'RestingBP', label: 'Resting BP', type: 'number', placeholder: 'e.g. 130', col: 1 },
+      { key: 'Cholesterol', label: 'Cholesterol', type: 'number', placeholder: 'e.g. 223', col: 1 },
+      { key: 'MaxHR', label: 'Max Heart Rate', type: 'number', placeholder: 'e.g. 138', col: 1 },
+      { key: 'Oldpeak', label: 'Oldpeak (ST Depression)', type: 'number', step: '0.1', placeholder: 'e.g. 0.6', col: 1 },
+      { key: 'FastingBS', label: 'Fasting Blood Sugar > 120', type: 'select', options: ['0', '1'], col: 2 },
+      { key: 'Sex', label: 'Sex', type: 'select', options: ['M', 'F'], col: 2 },
+      { key: 'ChestPainType', label: 'Chest Pain Type', type: 'select', options: ['ATA', 'NAP', 'TA', 'ASY'], col: 2 },
+      { key: 'RestingECG', label: 'Resting ECG', type: 'select', options: ['Normal', 'ST', 'LVH'], col: 2 },
+      { key: 'ExerciseAngina', label: 'Exercise Angina', type: 'select', options: ['N', 'Y'], col: 2 },
+      { key: 'ST_Slope', label: 'ST Slope', type: 'select', options: ['Up', 'Flat', 'Down'], col: 2 },
+    ];
+
+    function App() {
+      const [form, setForm] = useState({
+        Age: '', Sex: 'M', ChestPainType: 'ATA', RestingBP: '',
+        Cholesterol: '', FastingBS: '0', RestingECG: 'Normal',
+        MaxHR: '', ExerciseAngina: 'N', Oldpeak: '', ST_Slope: 'Up'
+      });
+      const [result, setResult] = useState(null);
+      const [loading, setLoading] = useState(false);
+      const [error, setError] = useState('');
+
+      const handleChange = (key, value) => {
+        setForm(prev => ({ ...prev, [key]: value }));
+        setResult(null);
+        setError('');
+      };
+
+      const handleSubmit = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        setError('');
+        setResult(null);
+
+        const payload = { ...form };
+        payload.Age = parseInt(payload.Age);
+        payload.RestingBP = parseFloat(payload.RestingBP);
+        payload.Cholesterol = parseFloat(payload.Cholesterol);
+        payload.MaxHR = parseInt(payload.MaxHR);
+        payload.Oldpeak = parseFloat(payload.Oldpeak);
+        payload.FastingBS = parseInt(payload.FastingBS);
+
+        if (!payload.Age || !payload.RestingBP || !payload.Cholesterol || !payload.MaxHR) {
+          setError('Please fill in all numeric fields');
+          setLoading(false);
+          return;
+        }
+
+        try {
+          const res = await fetch('http://127.0.0.1:8000/predict', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          if (!res.ok) throw new Error('Server error');
+          const data = await res.json();
+          setResult(data);
+        } catch (err) {
+          setError('Failed to connect to server. Make sure the backend is running.');
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const col1 = inputConfig.filter(i => i.col === 1);
+      const col2 = inputConfig.filter(i => i.col === 2);
+
+      return (
+        <div className="min-h-screen py-8 px-4">
+          <div className="max-w-5xl mx-auto">
+            <div className="text-center mb-8">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-500/20 mb-4 pulse">
+                <span className="text-3xl">❤️</span>
+              </div>
+              <h1 className="text-4xl font-bold text-white mb-2">CardioRisk Predictor</h1>
+              <p className="text-gray-400 text-lg">ML-based heart disease risk assessment</p>
+            </div>
+
+            <div className="card rounded-2xl p-8">
+              <form onSubmit={handleSubmit}>
+                <div className="grid md:grid-cols-2 gap-6 mb-8">
+                  <div className="space-y-5">
+                    {col1.map(field => (
+                      <div key={field.key}>
+                        <label className="block text-sm font-medium text-gray-300 mb-1.5">{field.label}</label>
+                        <input
+                          type={field.type}
+                          step={field.step || '1'}
+                          placeholder={field.placeholder}
+                          value={form[field.key]}
+                          onChange={e => handleChange(field.key, e.target.value)}
+                          className="input-field w-full rounded-lg px-4 py-2.5 text-white placeholder-gray-500"
+                          required={field.type === 'number'}
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="space-y-5">
+                    {col2.map(field => (
+                      <div key={field.key}>
+                        <label className="block text-sm font-medium text-gray-300 mb-1.5">{field.label}</label>
+                        <select
+                          value={form[field.key]}
+                          onChange={e => handleChange(field.key, e.target.value)}
+                          className="input-field w-full rounded-lg px-4 py-2.5 text-white"
+                        >
+                          {field.options.map(opt => (
+                            <option key={opt} value={opt} className="bg-slate-800">{opt}</option>
+                          ))}
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {error && (
+                  <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-center">{error}</div>
+                )}
+
+                {result && (
+                  <div className={`mb-6 p-6 rounded-xl border ${result.prediction === 1 ? 'bg-red-500/10 border-red-500/30' : 'bg-green-500/10 border-green-500/30'}`}>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold mb-2" style={{ color: result.prediction === 1 ? '#ef4444' : '#22c55e' }}>
+                        {result.risk} Risk
+                      </p>
+                      <p className="text-gray-400 text-sm mb-4">
+                        {result.prediction === 1
+                          ? 'The model indicates a likelihood of heart disease. Please consult a healthcare professional.'
+                          : 'The model indicates low risk of heart disease. Maintain a healthy lifestyle!'}
+                      </p>
+                      <div className="flex justify-center gap-8">
+                        <div>
+                          <p className="text-2xl font-bold text-green-400">{(result.probability_no_disease * 100).toFixed(1)}%</p>
+                          <p className="text-xs text-gray-500">No Disease</p>
+                        </div>
+                        <div className="w-px bg-gray-700"></div>
+                        <div>
+                          <p className="text-2xl font-bold text-red-400">{(result.probability_disease * 100).toFixed(1)}%</p>
+                          <p className="text-xs text-gray-500">Disease</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="btn-primary w-full py-3 rounded-lg text-white font-semibold text-lg"
+                >
+                  {loading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Analyzing...
+                    </span>
+                  ) : 'Predict Risk'}
+                </button>
+              </form>
+            </div>
+
+            <p className="text-center text-gray-600 text-xs mt-6">
+              This tool is for educational purposes only. Not a substitute for professional medical advice.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
